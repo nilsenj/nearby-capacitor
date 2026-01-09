@@ -1,6 +1,6 @@
 {
   "name": "@meetfolio/capacitor-nearby-share",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Capacitor plugin for Android Nearby Connections API",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
