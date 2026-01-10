@@ -154,6 +154,93 @@ NearbyShare.addListener('nearbyPayload', (data) => {
 await NearbyShare.stop();
 ```
 
+## Angular Implementation
+
+When using with Angular, you must wrap event callbacks in `NgZone.run()` to ensure the UI updates correctly.
+
+```typescript
+import { Component, NgZone, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { NearbyShare } from '@meetfolio/capacitor-nearby-share';
+import { PluginListenerHandle } from '@capacitor/core';
+
+@Component({
+  selector: 'app-nearby-share',
+  template: `
+    <button (click)="startSharing()">Start Sharing</button>
+    <div *ngFor="let device of devices">
+      {{ device.endpointName }}
+      <button (click)="connect(device.endpointId)">Connect</button>
+    </div>
+  `,
+})
+export class NearbyComponent implements OnDestroy {
+  devices: any[] = [];
+  private listeners: PluginListenerHandle[] = [];
+
+  constructor(private zone: NgZone, private cdr: ChangeDetectorRef) {}
+
+  async startSharing() {
+    try {
+      // 1. Start Advertising
+      await NearbyShare.startAdvertising({
+        data: { type: 'profile', name: 'My User' },
+        endpointName: 'My Device',
+        serviceId: 'com.myapp.share',
+      });
+
+      // 2. Start Discovery
+      await NearbyShare.startDiscovery({
+        serviceId: 'com.myapp.share',
+      });
+
+      // 3. Listen for devices
+      const foundListener = await NearbyShare.addListener(
+        'nearbyEndpointFound',
+        (event) => {
+          // IMPORTANT: Run inside Angular Zone
+          this.zone.run(() => {
+            this.devices.push(event);
+            this.cdr.detectChanges();
+          });
+        }
+      );
+      this.listeners.push(foundListener);
+
+      // 4. Handle incoming connections (Auto-accept)
+      const connListener = await NearbyShare.addListener(
+        'nearbyConnectionInitiated',
+        (event) => {
+          this.zone.run(async () => {
+            await NearbyShare.acceptConnection({
+              endpointId: event.endpointId,
+            });
+          });
+        }
+      );
+      this.listeners.push(connListener);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async connect(endpointId: string) {
+    await NearbyShare.requestConnection({
+      endpointId,
+      localName: 'My Device',
+    });
+  }
+
+  async ngOnDestroy() {
+    // Cleanup listeners
+    this.listeners.forEach((l) => l.remove());
+    this.listeners = [];
+
+    // Stop plugin
+    await NearbyShare.stop();
+  }
+}
+```
+
 ## API Reference
 
 ### Methods
